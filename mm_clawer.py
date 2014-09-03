@@ -60,6 +60,9 @@ class Clawer(object):
         data['limit'] = self.limit
         resp = urllib.urlopen(self.url).read()
         soup = BeautifulSoup(resp)
+        charset = soup.original_encoding
+        if charset != u'utf-8':
+            soup = BeautifulSoup(resp.decode(charset, 'ignore'))
         data['source'] = set((i['src'],i.parent['title']) 
             for i in soup.find_all('img',src=True)
             if i.parent.get('title') and '.gif' not in i.get('src'))
