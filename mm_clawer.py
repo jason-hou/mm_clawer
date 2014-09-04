@@ -44,6 +44,13 @@ def parse(content):
                if i.parent.get('title') and '.gif' not in i.get('src'))
 
 
+def download(url, path):
+    '''download file from url to path'''
+    # with open(path, 'wb', -1) as f:
+    # f.write(viewSource(url))
+    urllib.urlretrieve(url, path)
+
+
 class DownloadThread(threading.Thread):
 
     '''download thread'''
@@ -74,9 +81,7 @@ class DownloadThread(threading.Thread):
                     break
                 mutex.release()
             if begin:
-                with open(imagePath, 'wb', -1) as f:
-                    f.write(viewSource(url))
-                # urllib.urlretrieve(url, imagePath)
+                download(url, imagePath)
 
 
 class Clawer(object):
