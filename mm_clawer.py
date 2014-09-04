@@ -4,6 +4,7 @@
 import os
 import urllib
 import urllib2
+import urlparse
 import gzip
 import argparse
 import threading
@@ -19,29 +20,6 @@ data = {'amount': 0,
         'output': 'pics',
         'limit': None,
         'mutex': threading.Lock()}
-
-
-def viewSource(url):
-    '''open url to view source file, return file content'''
-    req = urllib2.Request(url)
-    req.add_header('Accept-encoding', 'gzip')
-    resp = urllib2.urlopen(req, timeout=5)
-    if resp.info().get('Content-Encoding') == 'gzip':
-        content = gzip.GzipFile(fileobj=StringIO(resp.read())).read()
-    else:
-        content = resp.read()
-    return content
-
-
-def parse(content):
-    '''parse html content, return set which contains items met target'''
-    soup = BeautifulSoup(content)
-    charset = soup.original_encoding
-    if charset != u'utf-8':
-        soup = BeautifulSoup(content.decode(charset, 'ignore'))
-    return set((i['src'], i.parent['title'])
-               for i in soup.find_all('img', src=True)
-               if i.parent.get('title') and '.gif' not in i.get('src'))
 
 
 def download(url, path):
@@ -65,7 +43,7 @@ class DownloadThread(threading.Thread):
                     if not limit or data.get('amount') < limit:
                         url, filename = data.get('source').pop()
                         imagePath = os.path.join(data.get('output'), '%s.%s' % (
-                            filename, url.split('.')[-1]))
+                            filename, 'jpg'))
                         data['amount'] = data.get('amount') + 1
                         if not os.path.exists(imagePath):
                             begin = True
@@ -93,12 +71,46 @@ class Clawer(object):
         self.number = number
         self.output = output
         self.limit = limit
+        self.links = set()
+
+    def parse(self, url):
+        '''parse url, return soup object'''
+        req = urllib2.Request(url)
+        req.add_header('Accept-encoding', 'gzip')
+        resp = urllib2.urlopen(req, timeout=5)
+        if resp.info().get('Content-Encoding') == 'gzip':
+            content = gzip.GzipFile(fileobj=StringIO(resp.read())).read()
+        else:
+            content = resp.read()
+        soup = BeautifulSoup(content)
+        charset = soup.original_encoding
+        if charset != u'utf-8':
+            soup = BeautifulSoup(content.decode(charset, 'ignore'))
+        return soup
+
+    def getLinks(self, url, depth=0):
+        '''get all links in url recursively'''
+        self.links.add(url)
+        links = set(urlparse.urljoin(self.url, i['href'])
+                    for i in self.parse(url).find_all('a', href=True)
+                    if i['href'].endswith('html') or i['href'].endswith('/'))
+        if depth > 0:
+            for i in links:
+                if i not in self.links:
+                    self.getLinks(i, depth - 1)
+
+    def getImages(self, url):
+        '''get images info from url'''
+        return set((i['src'], i.parent['title'])
+                   for i in self.parse(url).find_all('img', src=True)
+                   if i.parent.get('title') and '.gif' not in i.get('src'))
 
     def start(self):
+        self.getLinks(self.url)
         data['output'] = self.output
         data['limit'] = self.limit
-        content = viewSource(self.url)
-        data['source'] = parse(content)
+        for image in (self.getImages(i) for i in self.links):
+            data['source'] |= image
         if not os.path.exists(self.output):
             os.mkdir(self.output)
         for i in range(self.number):
