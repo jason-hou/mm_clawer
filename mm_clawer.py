@@ -2,6 +2,7 @@
 '''fetch image from specified web page'''
 
 import os
+import re
 import urllib
 import urllib2
 import urlparse
@@ -16,6 +17,7 @@ __author__ = "Jason Hou"
 __all__ = ['viewSource', 'parse', 'Clawer']
 
 DEBUG = False
+DEPTH = 0
 data = {'amount': 0,
         'source': set(),
         'output': 'pics',
@@ -89,12 +91,12 @@ class Clawer(object):
             soup = BeautifulSoup(content.decode(charset, 'ignore'))
         return soup
 
-    def getLinks(self, url, depth=0):
+    def getLinks(self, url, depth=DEPTH):
         '''get all links in url recursively'''
         self.links.add(url)
         links = set(urlparse.urljoin(self.url, i['href'])
                     for i in self.parse(url).find_all('a', href=True)
-                    if i['href'].endswith('html') or i['href'].endswith('/'))
+                    if re.search(r'(htm(l)?$|/$)', i['href']))
         if depth > 0:
             for i in links:
                 if i not in self.links:
