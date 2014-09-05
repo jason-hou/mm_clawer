@@ -10,6 +10,7 @@ import argparse
 import threading
 from bs4 import BeautifulSoup
 from StringIO import StringIO
+from multiprocessing.dummy import Pool
 
 __author__ = "Jason Hou"
 __all__ = ['viewSource', 'parse', 'Clawer']
@@ -101,15 +102,15 @@ class Clawer(object):
 
     def getImages(self, url):
         '''get images info from url'''
-        return set((i['src'], i.parent['title'])
+        return set((urlparse.urljoin(url, i['src']), i.parent['title'])
                    for i in self.parse(url).find_all('img', src=True)
-                   if i.parent.get('title') and '.gif' not in i.get('src'))
+                   if i.parent.get('title') and 'logo' not in i.get('src'))
 
     def start(self):
         self.getLinks(self.url)
         data['output'] = self.output
         data['limit'] = self.limit
-        for image in (self.getImages(i) for i in self.links):
+        for image in Pool().map(self.getImages, self.links):
             data['source'] |= image
         if not os.path.exists(self.output):
             os.mkdir(self.output)
