@@ -8,9 +8,9 @@ update history:
 1. Use BeautifulSoup to parse url, then fetch all image links;
 use urllib.urlretrieve to download it respectively in single threading;
 
-2. Refer to "Parallelism in one line"(link:https://medium.com/@thechriskiehl/par
-allelism-in-one-line-40e9b2b36148involve) ,use multiprocess.dummy.Pool().map to 
-download image in multi-threading way;
+2. Use multiprocessing.dummy.Pool().map to download image in multi-threading;
+Refer to "Parallelism in one line":(link:
+https://medium.com/@thechriskiehl/parallelism-in-one-line-40e9b2b36148involve)
 
 3. To achieve target that support download specified amount picture, the whole 
 threading need to synchronize, that is, a counter like is a must. 
@@ -41,4 +41,8 @@ download method.(revert later)
 9. Currently It's the bottleneck to parse each url in deep recursion. 
 Study multi-threading of multiprocess to solve the bottleneck when recursion 
 depth is not default...
+
+10. Reduce the time cost on parsing urls recursively.
+
+11. Handle htm url.
  
