@@ -9,20 +9,17 @@ import urlparse
 import gzip
 import argparse
 import threading
+import random
 from bs4 import BeautifulSoup
 from StringIO import StringIO
 from multiprocessing.dummy import Pool
+from multiprocessing import Queue
 
 __author__ = "Jason Hou"
-__all__ = ['viewSource', 'parse', 'Clawer']
+__all__ = ['Clawer']
 
 DEBUG = False
 DEPTH = 0
-data = {'amount': 0,
-        'source': set(),
-        'output': 'pics',
-        'limit': None,
-        'mutex': threading.Lock()}
 
 
 def download(url, path):
@@ -36,33 +33,22 @@ class DownloadThread(threading.Thread):
 
     '''download thread'''
 
+    def __init__(self, output, q):
+        self.output = output
+        self.q = q
+        threading.Thread.__init__(self)
+
     def run(self):
-        mutex = data.get('mutex')
-        limit = data.get('limit')
-        while True:
-            begin = False
-            if mutex.acquire(1):
-                if len(data.get('source')) > 0:
-                    if not limit or data.get('amount') < limit:
-                        url, filename = data.get('source').pop()
-                        imagePath = os.path.join(data.get('output'), '%s.%s' % (
-                            filename, 'jpg'))
-                        data['amount'] = data.get('amount') + 1
-                        if not os.path.exists(imagePath):
-                            begin = True
-                            print('%s start downloading %s to %s' % (
-                                self.name, url, imagePath))
-                        else:
-                            print('%s exists, stop downloading' % filename)
-                    else:
-                        mutex.release()
-                        break
-                else:
-                    mutex.release()
-                    break
-                mutex.release()
-            if begin:
+        while not self.q.empty():
+            url, filename = self.q.get()
+            imagePath = os.path.join(self.output, '%s.%s' % (
+                filename, 'jpg'))
+            if not os.path.exists(imagePath):
+                print('%s start downloading %s to %s' % (
+                    self.name, url, imagePath))
                 download(url, imagePath)
+            else:
+                print('%s exists, stop downloading' % filename)
 
 
 class Clawer(object):
@@ -75,6 +61,8 @@ class Clawer(object):
         self.output = output
         self.limit = limit
         self.links = set()
+        self.source = set()
+        self.queue = Queue()
 
     def parse(self, url):
         '''parse url, return soup object'''
@@ -110,14 +98,15 @@ class Clawer(object):
 
     def start(self):
         self.getLinks(self.url)
-        data['output'] = self.output
-        data['limit'] = self.limit
         for image in Pool().map(self.getImages, self.links):
-            data['source'] |= image
+            self.source |= image
+        if self.limit:
+            self.source = random.sample(self.source, self.limit)
+        map(self.queue.put, self.source)
         if not os.path.exists(self.output):
             os.mkdir(self.output)
         for i in range(self.number):
-            t = DownloadThread()
+            t = DownloadThread(self.output, self.queue)
             t.start()
 
 
