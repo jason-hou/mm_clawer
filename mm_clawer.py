@@ -13,12 +13,13 @@ import random
 from bs4 import BeautifulSoup
 from StringIO import StringIO
 from multiprocessing.dummy import Pool
-from multiprocessing import Queue
+from multiprocessing import Queue, Process
 
 __author__ = "Jason Hou"
 __all__ = ['Clawer']
 
 DEBUG = False
+UseThreading = True
 DEPTH = 0
 
 
@@ -46,6 +47,24 @@ class DownloadThread(threading.Thread):
             if not os.path.exists(imagePath):
                 print('%s start downloading %s to %s' % (
                     self.name, url, imagePath))
+                download(url, imagePath)
+            else:
+                print('%s exists, stop downloading' % filename)
+
+
+class DownloadProcess(Process):
+    def __init__(self, output, q):
+        self.output = output
+        self.q = q
+        Process.__init__(self)
+        
+    def run(self):        
+        while not self.q.empty():
+            url, filename = self.q.get()
+            imagePath = os.path.join(self.output, '%s.%s' % (
+                filename, 'jpg'))
+            if not os.path.exists(imagePath):
+                print('start downloading %s to %s' % (url, imagePath))
                 download(url, imagePath)
             else:
                 print('%s exists, stop downloading' % filename)
@@ -105,10 +124,10 @@ class Clawer(object):
         map(self.queue.put, self.source)
         if not os.path.exists(self.output):
             os.mkdir(self.output)
+        DOWNLOAD_METHOD = DownloadThread if UseThreading else DownloadProcess
         for i in range(self.number):
-            t = DownloadThread(self.output, self.queue)
-            t.start()
-
+            m = DOWNLOAD_METHOD(self.output, self.queue)
+            m.start()
 
 def options():
     parser = argparse.ArgumentParser(
